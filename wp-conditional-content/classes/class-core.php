@@ -33,9 +33,20 @@ class WP_Conditional_Content {
 	 * 
 	 */
 	public function short_code_if( $atts, $content ) {
-
 		if ( empty( $atts ) )
 			return $content;
+
+		$elseif = false;
+
+		list ( $if_content, $else_content ) = preg_split( '/\[elseif (.*?)\]/', $content, 2 );
+		preg_match('/\[elseif (.*?)\]/', $content, $elseif_shortcode_params);
+
+
+		if ( $else_content && is_array( $elseif_shortcode_params ) && !empty( $elseif_shortcode_params[1] ) ) {
+			$elseif = true;
+		} else {
+			list ($if_content, $else_content) = explode('[else]', $content, 2 );
+		}
 
 		$condition_met = false;
 
@@ -43,8 +54,15 @@ class WP_Conditional_Content {
 
 		if ( isset( $atts['match'] ) )
 			$match = ( 'contain' == $atts['match'] ) ? 'contain' : 'exact';
-		
+
 		foreach ( $atts as $key => $value ) {
+
+			$negative = false;
+
+			if ( strpos( $value, '!' ) === 0 ) {
+				$negative = true;
+				$value = substr($value, 1);
+			}
 
 			if ( 'qs' == $key )
 				$condition_met = $this->condition_query_string( $value, $match );
@@ -55,12 +73,18 @@ class WP_Conditional_Content {
 			elseif ( 'role' == $key )
 				$condition_met = $this->condition_user_role( $value );
 
-			if( ! $condition_met )
-				return '';
-
+			if ( $negative ) {
+				$condition_met = !$condition_met;
+			}
 		}
 
-		return do_shortcode( $content );
+		if ( $condition_met ) {
+			return do_shortcode( $if_content );
+		} else if ( $elseif ) {
+			return do_shortcode( '[if ' . $elseif_shortcode_params[1] . ']' . $else_content . '[/if]');
+		} else {
+			return do_shortcode( $else_content );
+		}
 
 	}
 
